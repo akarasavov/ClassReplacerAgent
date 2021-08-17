@@ -1,6 +1,7 @@
 package atk.agent;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -11,13 +12,15 @@ public class AgentArguments
 {
     private final String classNameSelector;
     private final Path overrideJar;
-    private final Optional<Path> logsDir;
+    private final Integer classCount;
+    private final Optional<Path> logFilePath;
 
-    AgentArguments( String classNameSelector, String overrideJarPath, Optional<Path> logsDir )
+    AgentArguments( String classNameSelector, String overrideJarPath, String classCount, Optional<Path> logsDir, Instant now )
     {
         this.classNameSelector = validateNotNull( classNameSelector, Parameters.CLASS_NAME_SELECTOR.value + " is not set" );
         this.overrideJar = Path.of( validateNotNull( overrideJarPath, Parameters.OVERRIDE_JAR.value + " is not set" ) );
-        this.logsDir = logsDir;
+        this.classCount = Integer.valueOf( validateNotNull( classCount, Parameters.CLASS_COUNT.value + " is not set" ) );
+        this.logFilePath = logsDir.map( dir -> dir.resolve( "agent-" + now + ".log" ) );
     }
 
     private <T> T validateNotNull( T value, String message )
@@ -39,15 +42,21 @@ public class AgentArguments
         return overrideJar;
     }
 
-    public Optional<Path> getLogsDir()
+    public Optional<Path> getLogFilePath()
     {
-        return logsDir;
+        return logFilePath;
+    }
+
+    public boolean canReplaceMoreClasses( int replacedClasses )
+    {
+        return classCount > replacedClasses;
     }
 
     private enum Parameters
     {
         CLASS_NAME_SELECTOR( "classNameSelector" ),
         OVERRIDE_JAR( "overrideJar" ),
+        CLASS_COUNT( "classCount"),
         LOGS_DIR( "logsDir" );
 
         private final String value;
@@ -63,7 +72,7 @@ public class AgentArguments
         }
     }
 
-    public static AgentArguments from( String args )
+    public static AgentArguments from( String args, Instant now )
     {
         if ( args == null )
         {
@@ -83,7 +92,8 @@ public class AgentArguments
         }
         return new AgentArguments( parameterValueMap.get( Parameters.CLASS_NAME_SELECTOR ),
                                    parameterValueMap.get( Parameters.OVERRIDE_JAR ),
-                                   Optional.ofNullable( parameterValueMap.get( Parameters.LOGS_DIR ) ).map( Path::of ) );
+                                   parameterValueMap.get( Parameters.CLASS_COUNT ),
+                                   Optional.ofNullable( parameterValueMap.get( Parameters.LOGS_DIR ) ).map( Path::of ), now );
     }
 
     @Override
@@ -98,12 +108,13 @@ public class AgentArguments
             return false;
         }
         AgentArguments that = (AgentArguments) o;
-        return Objects.equals( classNameSelector, that.classNameSelector ) && Objects.equals( overrideJar, that.overrideJar );
+        return Objects.equals( classNameSelector, that.classNameSelector ) && Objects.equals( overrideJar, that.overrideJar ) &&
+               Objects.equals( logFilePath, that.logFilePath );
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash( classNameSelector, overrideJar );
+        return Objects.hash( classNameSelector, overrideJar, logFilePath );
     }
 }

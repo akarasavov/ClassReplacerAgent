@@ -3,4 +3,3 @@ Premain-Class: atk.agent.ClassReplaceAgent
 Agent-Class: atk.agent.ClassReplaceAgent
 Launcher-Agent-Class: atk.agent.ClassReplaceAgent
 Can-Redefine-Classes: true
-Can-Retransform-Classes: true
