@@ -14,27 +14,28 @@ import java.lang.instrument.Instrumentation;
 import java.nio.file.Path;
 import java.security.ProtectionDomain;
 import java.time.Clock;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ClassTransformer implements ClassFileTransformer
 {
     private final AgentArguments agentArguments;
     private final ClassPool classPool;
     private final Instrumentation instrumentation;
-    private int replacedClasses;
+    private final AtomicInteger replacedClasses = new AtomicInteger();
 
     public ClassTransformer( AgentArguments agentArguments, ClassPool classPool, Instrumentation instrumentation )
     {
         this.agentArguments = agentArguments;
         this.classPool = classPool;
         this.instrumentation = instrumentation;
-        instrumentation.addTransformer( this );
+        instrumentation.addTransformer( this, true );
     }
 
     @Override
     public byte[] transform( ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
                              byte[] classfileBuffer ) throws IllegalClassFormatException
     {
-        if ( !agentArguments.canReplaceMoreClasses( replacedClasses ) )
+        if ( !agentArguments.canReplaceMoreClasses( replacedClasses.get() ) )
         {
             instrumentation.removeTransformer( this );
         }
@@ -44,7 +45,7 @@ public class ClassTransformer implements ClassFileTransformer
             {
                 final String classPath = className.replace( "/", "." );
                 final var transformedClass = replaceClass( className, classPath, classPool );
-                replacedClasses++;
+                replacedClasses.incrementAndGet();
                 return transformedClass;
             }
             else
@@ -66,7 +67,9 @@ public class ClassTransformer implements ClassFileTransformer
         print( "Tried to replace class " + classPath, agentArguments );
         CtClass cc = classPool.get( packageClassPath );
         print( "Successfully replaced class " + packageClassPath, agentArguments );
-        return cc.toBytecode();
+        var result = cc.toBytecode();
+        cc.detach();
+        return result;
     }
 
     private void print( String className, AgentArguments agentArguments )
